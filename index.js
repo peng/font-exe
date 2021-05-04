@@ -3,17 +3,18 @@ const assert = require('assert');
 
 fs.readFile('./fontFile/HanyiSentyCrayon.ttf', (err, data) => {
   if (err) throw err;
-  console.log(data);
+//   console.log(data);
   const fontData = new Uint8Array(data);
+  console.log(getInt32(fontData[1]));
 
-  for (let i = 0; i < 10; i++) {
-    console.log(fontData[i]);
-    console.log(getUint16([fontData[i]]));
-    console.log(getUint32([fontData[i]]));
-  }
+//   for (let i = 0; i < 10; i++) {
+//     console.log(fontData[i]);
+//     console.log(getUint16([fontData[i]]));
+//     console.log(getUint32([fontData[i]]));
+//   }
   
-//   const ttf = new TrueTypeFont(data);
-//   console.log(ttf.tables);
+  const ttf = new TrueTypeFont(data);
+  console.log(ttf.tables);
 
 });
 
@@ -70,6 +71,17 @@ BinaryReader.prototype = {
     }, 
 
     getInt32: function() {//读取四字节有符号整型
+        /* 
+         * 位移运算解析
+         *
+         * 例如 1
+         * 8 位计数法：00000001
+         *  00000001000000000000000000000000  左位移24位
+         *          000000010000000000000000  左位移16位
+         *                  0000000100000000  左位移8位
+         *                          00000001  没有位移
+         *  00000001000000010000000100000001  进行或运算，结果，转换为十进制值为16843009
+         */
         return ((this.getUint8() << 24) | 
                 (this.getUint8() << 16) |
                 (this.getUint8() <<  8) |
@@ -148,5 +160,28 @@ TrueTypeFont.prototype = {
 
       file.seek(old);
       return sum;
-  }
+  },
+  readHeadTable: function(file) {
+    assert("head" in this.tables);
+    file.seek(this.tables["head"].offset);
+
+    this.version = file.getFixed();
+    this.fontRevision = file.getFixed();
+    this.checksumAdjustment = file.getUint32();
+    this.magicNumber = file.getUint32();
+    assert(this.magicNumber === 0x5f0f3cf5);
+    this.flags = file.getUint16();
+    this.unitsPerEm = file.getUint16();
+    this.created = file.getDate();
+    this.modified = file.getDate();
+    this.xMin = file.getFword();
+    this.yMin = file.getFword();
+    this.xMax = file.getFword();
+    this.yMax = file.getFword();
+    this.macStyle = file.getUint16();
+    this.lowestRecPPEM = file.getUint16();
+    this.fontDirectionHint = file.getInt16();
+    this.indexToLocFormat = file.getInt16();
+    this.glyphDataFormat = file.getInt16();
+},
 }
