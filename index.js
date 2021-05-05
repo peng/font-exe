@@ -5,30 +5,11 @@ fs.readFile('./fontFile/HanyiSentyCrayon.ttf', (err, data) => {
   if (err) throw err;
 //   console.log(data);
   const fontData = new Uint8Array(data);
-  console.log(getInt32(fontData[1]));
+  const ttfInfo = new TrueTypeFont(data);
+  console.log(ttfInfo);
 
-//   for (let i = 0; i < 10; i++) {
-//     console.log(fontData[i]);
-//     console.log(getUint16([fontData[i]]));
-//     console.log(getUint32([fontData[i]]));
-//   }
-  
-  const ttf = new TrueTypeFont(data);
-  console.log(ttf.tables);
 
 });
-
-function getUint16(data) {
-    return ((data << 8) | data) >>> 0;
-}
-
-function getInt32(data) {
-    return ((data << 24) | data << 16 | data << 8 | data)
-}
-
-function getUint32(data) {
-    return getInt32(data) >>> 0
-}
 
 function BinaryReader(arrayBuffer)
 {
