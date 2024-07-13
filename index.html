@@ -148,11 +148,14 @@
       },
       readOffsetTables: function (file) {
         var tables = {};
-        this.scalarType = file.getUint32();
+        const offsetTable = {}
+        offsetTable.scalarType = file.getUint32();
         var numTables = file.getUint16();
-        this.searchRange = file.getUint16();
-        this.entrySelector = file.getUint16();
-        this.rangeShift = file.getUint16();
+        offsetTable.numTables = numTables
+        offsetTable.searchRange = file.getUint16();
+        offsetTable.entrySelector = file.getUint16();
+        offsetTable.rangeShift = file.getUint16();
+        this.offsetTable = offsetTable
 
         for (var i = 0; i < numTables; i++) {
           var tag = file.getString(4);
@@ -370,32 +373,33 @@
 
     function ShowTtfFile(arrayBuffer) {
       var font = new TrueTypeFont(arrayBuffer);
+      console.log(font)
 
-      var width = font.xMax - font.xMin;
-      var height = font.yMax - font.yMin;
-      var scale = 64 / font.unitsPerEm;
+      // var width = font.xMax - font.xMin;
+      // var height = font.yMax - font.yMin;
+      // var scale = 64 / font.unitsPerEm;
 
-      var container = document.getElementById("font-container");
+      // var container = document.getElementById("font-container");
 
-      while (container.firstChild) {
-        container.removeChild(container.firstChild);
-      }
+      // while (container.firstChild) {
+      //   container.removeChild(container.firstChild);
+      // }
 
-      for (var i = 0; i < font.length; i++) {
-        var canvas = document.createElement("canvas");
-        canvas.style.border = "1px solid gray";
-        canvas.width = width * scale;
-        canvas.height = height * scale;
-        var ctx = canvas.getContext("2d");
-        ctx.scale(scale, -scale);
-        ctx.translate(-font.xMin, -font.yMin - height);
-        ctx.fillStyle = "#000000";
-        ctx.beginPath();
-        if (font.drawGlyph(i, ctx)) {
-          ctx.fill();
-          container.appendChild(canvas);
-        }
-      }
+      // for (var i = 0; i < font.length; i++) {
+      //   var canvas = document.createElement("canvas");
+      //   canvas.style.border = "1px solid gray";
+      //   canvas.width = width * scale;
+      //   canvas.height = height * scale;
+      //   var ctx = canvas.getContext("2d");
+      //   ctx.scale(scale, -scale);
+      //   ctx.translate(-font.xMin, -font.yMin - height);
+      //   ctx.fillStyle = "#000000";
+      //   ctx.beginPath();
+      //   if (font.drawGlyph(i, ctx)) {
+      //     ctx.fill();
+      //     container.appendChild(canvas);
+      //   }
+      // }
     }
   </script>
 </html>
