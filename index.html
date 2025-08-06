@@ -339,13 +339,94 @@
         readCoords("x", X_IS_BYTE, X_DELTA, glyph.xMin, glyph.xMax);
         readCoords("y", Y_IS_BYTE, Y_DELTA, glyph.yMin, glyph.yMax);
       },
+
+      readCompoundGlyph: function (file, glyph) {
+        var ARG_1_AND_2_ARE_WORDS = 1,
+          ARGS_ARE_XY_VALUES = 2,
+          ROUND_XY_TO_GRID = 4,
+          WE_HAVE_A_SCALE = 8,
+          MORE_COMPONENTS = 32,
+          WE_HAVE_AN_X_AND_Y_SCALE = 64,
+          WE_HAVE_A_TWO_BY_TWO = 128,
+          WE_HAVE_INSTRUCTIONS = 256,
+          USE_MY_METRICS = 512;
+
+        glyph.type = "compound";
+        glyph.components = [];
+
+        var flags, glyphIndex, e1, e2, e3, e4, e5, e6;
+        do {
+          flags = file.getUint16();
+          glyphIndex = file.getUint16();
+
+          var component = {
+            glyphIndex: glyphIndex,
+            matrix: {
+              a: 1, b: 0, c: 0, d: 1, e: 0, f: 0
+            }
+          };
+
+          if (flags & ARG_1_AND_2_ARE_WORDS) {
+            e1 = file.getInt16();
+            e2 = file.getInt16();
+          } else {
+            e1 = file.getUint8();
+            e2 = file.getUint8();
+            if (e1 & 0x80) e1 -= 256;
+            if (e2 & 0x80) e2 -= 256;
+          }
+
+          if (flags & ARGS_ARE_XY_VALUES) {
+            component.matrix.e = e1;
+            component.matrix.f = e2;
+          } else {
+            // 这种情况下 e1 和 e2 是点索引，需要从父字体中获取点坐标
+            // 为简化起见，这里暂时按 XY 值处理
+            component.matrix.e = e1;
+            component.matrix.f = e2;
+          }
+
+          if (flags & WE_HAVE_A_SCALE) {
+            e3 = file.get2Dot14();
+            component.matrix.a = e3;
+            component.matrix.d = e3;
+          } else if (flags & WE_HAVE_AN_X_AND_Y_SCALE) {
+            component.matrix.a = file.get2Dot14();
+            component.matrix.d = file.get2Dot14();
+          } else if (flags & WE_HAVE_A_TWO_BY_TWO) {
+            component.matrix.a = file.get2Dot14();
+            component.matrix.b = file.get2Dot14();
+            component.matrix.c = file.get2Dot14();
+            component.matrix.d = file.get2Dot14();
+          }
+
+          glyph.components.push(component);
+        } while (flags & MORE_COMPONENTS);
+
+        if (flags & WE_HAVE_INSTRUCTIONS) {
+          var instructionLength = file.getUint16();
+          // 跳过指令数据
+          file.seek(file.tell() + instructionLength);
+        }
+      },
+
       drawGlyph: function (index, ctx) {
         var glyph = this.readGlyph(index);
 
-        if (glyph === null || glyph.type !== "simple") {
+        if (glyph === null) {
           return false;
         }
 
+        if (glyph.type === "simple") {
+          return this.drawSimpleGlyph(glyph, ctx);
+        } else if (glyph.type === "compound") {
+          return this.drawCompoundGlyph(glyph, ctx);
+        }
+
+        return false;
+      },
+
+      drawSimpleGlyph: function (glyph, ctx) {
         var p = 0,
           c = 0,
           first = 1;
@@ -369,37 +450,91 @@
 
         return true;
       },
+
+      drawCompoundGlyph: function (glyph, ctx) {
+        console.log('draw comp', glyph)
+        var hasDrawn = false;
+
+        // 保存原始样式
+        var originalStrokeStyle = ctx.strokeStyle;
+        var originalLineWidth = ctx.lineWidth;
+
+        for (var i = 0; i < glyph.components.length; i++) {
+          var component = glyph.components[i];
+          var componentGlyph = this.readGlyph(component.glyphIndex);
+
+          if (componentGlyph === null) {
+            continue;
+          }
+
+          // 保存当前变换状态
+          ctx.save();
+
+          // 应用组件变换矩阵
+          var matrix = component.matrix;
+          ctx.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
+
+          // 递归绘制组件字体
+          if (this.drawGlyph(component.glyphIndex, ctx)) {
+            hasDrawn = true;
+          }
+
+          // 恢复变换状态
+          ctx.restore();
+        }
+
+        // 为复合字体添加红色边框
+        if (hasDrawn) {
+          ctx.save();
+          ctx.strokeStyle = "red";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]); // 虚线边框
+          
+          // 绘制字体边界框
+          ctx.strokeRect(glyph.xMin, glyph.yMin, 
+                        glyph.xMax - glyph.xMin, 
+                        glyph.yMax - glyph.yMin);
+          
+          ctx.restore();
+          
+          // 恢复原始样式
+          ctx.strokeStyle = originalStrokeStyle;
+          ctx.lineWidth = originalLineWidth;
+        }
+
+        return hasDrawn;
+      },
     };
 
     function ShowTtfFile(arrayBuffer) {
       var font = new TrueTypeFont(arrayBuffer);
       console.log(font)
 
-      // var width = font.xMax - font.xMin;
-      // var height = font.yMax - font.yMin;
-      // var scale = 64 / font.unitsPerEm;
+      var width = font.xMax - font.xMin;
+      var height = font.yMax - font.yMin;
+      var scale = 64 / font.unitsPerEm;
 
-      // var container = document.getElementById("font-container");
+      var container = document.getElementById("font-container");
 
-      // while (container.firstChild) {
-      //   container.removeChild(container.firstChild);
-      // }
+      while (container.firstChild) {
+        container.removeChild(container.firstChild);
+      }
 
-      // for (var i = 0; i < font.length; i++) {
-      //   var canvas = document.createElement("canvas");
-      //   canvas.style.border = "1px solid gray";
-      //   canvas.width = width * scale;
-      //   canvas.height = height * scale;
-      //   var ctx = canvas.getContext("2d");
-      //   ctx.scale(scale, -scale);
-      //   ctx.translate(-font.xMin, -font.yMin - height);
-      //   ctx.fillStyle = "#000000";
-      //   ctx.beginPath();
-      //   if (font.drawGlyph(i, ctx)) {
-      //     ctx.fill();
-      //     container.appendChild(canvas);
-      //   }
-      // }
+      for (var i = 0; i < font.length; i++) {
+        var canvas = document.createElement("canvas");
+        canvas.style.border = "1px solid gray";
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        var ctx = canvas.getContext("2d");
+        ctx.scale(scale, -scale);
+        ctx.translate(-font.xMin, -font.yMin - height);
+        ctx.fillStyle = "#000000";
+        ctx.beginPath();
+        if (font.drawGlyph(i, ctx)) {
+          ctx.fill();
+          container.appendChild(canvas);
+        }
+      }
     }
   </script>
 </html>
